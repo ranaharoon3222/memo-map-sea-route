@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sea Route Visualization</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <script>
+    mapboxgl.accessToken =
+      'pk.eyJ1IjoibWVtb21hcCIsImEiOiJjbG4zZ3F3NmMwM2V2MmtxbzRleXFpbWNwIn0.X5b1s12j2IIMcnQr6ZkWYA';
+
+    const routes = [
+      { origin: [9.9937, 53.5511], destination: [8.9463, 44.4056] },
+      { origin: [8.8017, 53.0793], destination: [14.2681, 40.8518] },
+      { origin: [10.139, 54.3233], destination: [13.7768, 45.6495] },
+      { origin: [10.6866, 53.8655], destination: [28.9784, 41.0082] },
+      { origin: [8.127, 53.5251], destination: [27.1428, 38.4237] },
+    ];
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/memomap/cln7tqdrh03ds01r47rj54s2e',
+      center: [10, 50],
+      zoom: 3,
+    });
+
+    const fetchRoute = async (origin, destination) => {
+      const url = 'http://localhost:3000/route';
+      const options = {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ origin, destination, units: 'kilometers' }),
+      };
+      try {
+        const response = await fetch(url, options);
+        return await response.json();
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    map.on('load', async () => {
+      for (const route of routes) {
+        const routeData = await fetchRoute(route.origin, route.destination);
+        if (!routeData) continue;
+
+        map.addSource(`route-${route.origin[0]}`, {
+          type: 'geojson',
+          data: routeData.route,
+        });
+
+        map.addLayer({
+          id: `route-line-${route.origin[0]}`,
+          type: 'line',
+          source: `route-${route.origin[0]}`,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': '#0080ff',
+            'line-width': 3,
+            'line-opacity': 0.8,
+          },
+        });
+
+        new mapboxgl.Marker({ color: 'green' })
+          .setLngLat(route.origin)
+          .addTo(map);
+
+        new mapboxgl.Marker({ color: 'red' })
+          .setLngLat(route.destination)
+          .addTo(map);
+      }
+    });
+  </script>
+</body>
+
+</html>
