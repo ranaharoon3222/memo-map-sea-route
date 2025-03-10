@@ -76,7 +76,7 @@ app.post('/route', (req, res) => {
       success: true,
       route: makeRoute,
       distance: route.properties.length,
-      units: units || 'nautical',
+      units: 'nm',
     });
   } catch (error) {
     console.error('Error calculating route:', error);
