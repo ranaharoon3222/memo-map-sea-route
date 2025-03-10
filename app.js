@@ -59,10 +59,22 @@ app.post('/route', (req, res) => {
     // Calculate the sea route
     const route = searoute(origin, destination, 'nm');
 
+    const makeRoute = {
+      type: 'Feature',
+      properties: {
+        length: route.properties.length,
+        units: 'nm',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [origin, ...route.geometry.coordinates, destination],
+      },
+    };
+
     // Return the route data
     return res.json({
       success: true,
-      route: route,
+      route: makeRoute,
       distance: route.properties.length,
       units: units || 'nautical',
     });
