@@ -136,7 +136,7 @@ if (cluster.isMaster) {
           },
           geometry: {
             type: 'LineString',
-            coordinates: [origin, ...route.geometry.coordinates, destination],
+            coordinates: [...route.geometry.coordinates],
           },
         },
         distance: route.properties.length,

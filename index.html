@@ -29,18 +29,16 @@
       'pk.eyJ1IjoibWVtb21hcCIsImEiOiJjbG4zZ3F3NmMwM2V2MmtxbzRleXFpbWNwIn0.X5b1s12j2IIMcnQr6ZkWYA';
 
     const routes = [
-      { origin: [9.9937, 53.5511], destination: [8.9463, 44.4056] },
-      { origin: [8.8017, 53.0793], destination: [14.2681, 40.8518] },
-      { origin: [10.139, 54.3233], destination: [13.7768, 45.6495] },
-      { origin: [10.6866, 53.8655], destination: [28.9784, 41.0082] },
-      { origin: [8.127, 53.5251], destination: [27.1428, 38.4237] },
+      {
+        origin: [174.7631803, -36.852095], destination: [174.71702278, -35.96217845]
+      }
     ];
 
     const map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/memomap/cln7tqdrh03ds01r47rj54s2e',
-      center: [10, 50],
-      zoom: 3,
+      center: [174.7631803, -36.852095],
+      zoom: 8,
     });
 
     const fetchRoute = async (origin, destination) => {
@@ -48,7 +46,7 @@
       const options = {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ origin, destination, units: 'kilometers' }),
+        body: JSON.stringify({ origin, destination, }),
       };
       try {
         const response = await fetch(url, options);
@@ -61,6 +59,10 @@
     map.on('load', async () => {
       for (const route of routes) {
         const routeData = await fetchRoute(route.origin, route.destination);
+
+        console.log(routeData);
+
+
         if (!routeData) continue;
 
         map.addSource(`route-${route.origin[0]}`, {
