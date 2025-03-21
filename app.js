@@ -5,6 +5,8 @@ const cluster = require('cluster');
 const os = require('os');
 const compression = require('compression');
 const { promisify } = require('util');
+var polyline = require('@mapbox/polyline');
+// const fetch = require('node-fetch');
 
 // Cache configuration
 const NodeCache = require('node-cache');
@@ -141,6 +143,71 @@ if (cluster.isMaster) {
         },
         distance: route.properties.length,
         units,
+      };
+
+      // Store in cache
+      routeCache.set(cacheKey, result);
+
+      // Return the route data
+      return res.json(result);
+    } catch (error) {
+      console.error('Error calculating route:', error.message);
+      return res.status(500).json({
+        error: 'Failed to calculate route',
+        message: error.message,
+      });
+    }
+  });
+
+  app.post('/train', async (req, res) => {
+    try {
+      const { origin, destination } = req.body;
+
+      // Validate input with early return pattern
+      if (!origin || !destination) {
+        return res.status(400).json({
+          error: 'Both origin and destination points are required',
+        });
+      }
+
+      // Generate cache key
+      const cacheKey = `${origin[0]},${origin[1]}_${destination[0]},${destination[1]}`;
+
+      // Check cache first
+      const cachedResult = routeCache.get(cacheKey);
+      if (cachedResult) {
+        return res.json(cachedResult);
+      }
+
+      // Quick validation of coordinates
+      if (
+        !Array.isArray(origin) ||
+        origin.length !== 2 ||
+        !Array.isArray(destination) ||
+        destination.length !== 2
+      ) {
+        return res.status(400).json({
+          error:
+            'Origin and destination must be valid coordinate arrays [longitude, latitude]',
+        });
+      }
+
+      const url = `https://routing.openrailrouting.org/route?point=${origin[0]}%2C${origin[1]}&point=${destination[0]}%2C${destination[1]}&type=json&locale=en-US&&profile=all_tracks`;
+
+      const url2 = `https://signal.eu.org/osm/eu/route/v1/train/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full`;
+
+      const fetchRes = await fetch(url2);
+      const data = await fetchRes.json();
+
+      // const point = data['paths'][0]['points'];
+      const point = data['routes'][0]['geometry'];
+
+      const converToJson = polyline.toGeoJSON(point);
+
+      const result = {
+        type: 'Feature',
+        properties: {},
+        geometry: converToJson,
       };
 
       // Store in cache
