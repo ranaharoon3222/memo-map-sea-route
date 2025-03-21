@@ -205,10 +205,22 @@ if (cluster.isMaster) {
       const converToJson = polyline.toGeoJSON(point);
 
       const result = {
-        type: 'Feature',
-        properties: {},
-        geometry: converToJson,
+        success: true,
+        route: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [...converToJson.coordinates],
+          },
+        },
       };
+
+      // const result = {
+      //   type: 'Feature',
+      //   properties: {},
+      //   geometry: converToJson,
+      // };
 
       // Store in cache
       routeCache.set(cacheKey, result);
