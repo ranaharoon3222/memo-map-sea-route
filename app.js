@@ -6,15 +6,25 @@ const os = require('os');
 const compression = require('compression');
 const { promisify } = require('util');
 var polyline = require('@mapbox/polyline');
-const PQueue = require('p-queue').default;
 
-// const fetch = require('node-fetch');
+let PQueue;
+let locationIQQueue;
+
+(async () => {
+  const mod = await import('p-queue');
+  PQueue = mod.default;
+
+  // Create queue after import
+  locationIQQueue = new PQueue({
+    interval: 1000, // 1 second window
+    intervalCap: 2, // max 2 requests per window
+  });
+})();
 
 // Cache configuration
 const NodeCache = require('node-cache');
 const routeCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
-const locationIQQueue = new PQueue({ interval: 1000, intervalCap: 2 });
 const rateLimitedFetch = (url) => locationIQQueue.add(() => fetch(url));
 
 // Number of workers based on CPU cores
