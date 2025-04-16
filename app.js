@@ -6,11 +6,16 @@ const os = require('os');
 const compression = require('compression');
 const { promisify } = require('util');
 var polyline = require('@mapbox/polyline');
+const PQueue = require('p-queue');
+
 // const fetch = require('node-fetch');
 
 // Cache configuration
 const NodeCache = require('node-cache');
 const routeCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
+
+const locationIQQueue = new PQueue({ interval: 1000, intervalCap: 2 });
+const rateLimitedFetch = (url) => locationIQQueue.add(() => fetch(url));
 
 // Number of workers based on CPU cores
 const numCPUs = os.cpus().length;
@@ -159,10 +164,7 @@ if (cluster.isMaster) {
     }
   });
 
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
   app.post('/train', async (req, res) => {
-    await delay(1000);
     try {
       const { origin, destination } = req.body;
 
@@ -195,15 +197,21 @@ if (cluster.isMaster) {
         });
       }
 
-      const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
-      const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
+      const getStation = async (lat, lon) => {
+        const key = `${lat},${lon}`;
 
-      const originRes = await fetch(originStationUrl);
-      const destinationRes = await fetch(destinationStationUrl);
+        const url = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${lat}&lon=${lon}&tag=railway_station&radius=30000&limit=1`;
 
+        const res = await rateLimitedFetch(url);
+        const data = await res.json();
+        stationCache.set(key, data);
+        return data;
+      };
+
+      // Fetch origin and destination stations with throttling
       const [originStationData, destinationStationData] = await Promise.all([
-        originRes.json(),
-        destinationRes.json(),
+        getStation(origin[1], origin[0]),
+        getStation(destination[1], destination[0]),
       ]);
 
       const originStation = originStationData?.[0];
