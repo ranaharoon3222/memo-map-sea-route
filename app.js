@@ -6,7 +6,7 @@ const os = require('os');
 const compression = require('compression');
 const { promisify } = require('util');
 var polyline = require('@mapbox/polyline');
-const PQueue = require('p-queue');
+const PQueue = require('p-queue').default;
 
 // const fetch = require('node-fetch');
 
