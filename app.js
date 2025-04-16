@@ -204,7 +204,6 @@ if (cluster.isMaster) {
 
         const res = await rateLimitedFetch(url);
         const data = await res.json();
-        stationCache.set(key, data);
         return data;
       };
 
