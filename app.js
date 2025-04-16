@@ -192,9 +192,39 @@ if (cluster.isMaster) {
         });
       }
 
-      const url = `https://routing.openrailrouting.org/route?point=${origin[0]}%2C${origin[1]}&point=${destination[0]}%2C${destination[1]}&type=json&locale=en-US&&profile=all_tracks`;
+      const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
+      const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
 
-      const url2 = `https://signal.eu.org/osm/eu/route/v1/train/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full`;
+      const originRes = await fetch(originStationUrl);
+      const destinationRes = await fetch(destinationStationUrl);
+
+      const [originStationData, destinationStationData] = await Promise.all([
+        originRes.json(),
+        destinationRes.json(),
+      ]);
+
+      const originStation = originStationData?.[0];
+      const destinationStation = destinationStationData?.[0];
+
+      if (!originStation || !destinationStation) {
+        return res.status(404).json({
+          error:
+            'Could not find railway stations near the provided coordinates.',
+        });
+      }
+
+      const newOrigin = [
+        parseFloat(originStation.lon),
+        parseFloat(originStation.lat),
+      ];
+      const newDestination = [
+        parseFloat(destinationStation.lon),
+        parseFloat(destinationStation.lat),
+      ];
+
+      const url = `https://routing.openrailrouting.org/route?point=${newOrigin[0]}%2C${newOrigin[1]}&point=${newDestination[0]}%2C${newDestination[1]}&type=json&locale=en-US&&profile=all_tracks`;
+
+      const url2 = `https://signal.eu.org/osm/eu/route/v1/train/${newOrigin[0]},${newOrigin[1]};${newDestination[0]},${newDestination[1]}?overview=full`;
 
       const fetchRes = await fetch(url2);
       const data = await fetchRes.json();
