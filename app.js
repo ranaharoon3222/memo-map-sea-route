@@ -32,7 +32,7 @@ import NodeCache from 'node-cache';
 const routeCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
 // Number of workers based on CPU cores
-const numCPUs = os.cpus().length - 5;
+const numCPUs = os.cpus().length;
 
 if (cluster.isMaster) {
   console.log(`Master ${process.pid} is running`);
