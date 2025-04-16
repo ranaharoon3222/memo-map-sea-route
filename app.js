@@ -159,7 +159,10 @@ if (cluster.isMaster) {
     }
   });
 
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
   app.post('/train', async (req, res) => {
+    await delay(1000);
     try {
       const { origin, destination } = req.body;
 
