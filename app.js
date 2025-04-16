@@ -9,6 +9,7 @@ var polyline = require('@mapbox/polyline');
 
 let PQueue;
 let locationIQQueue;
+const stationCache = new Map();
 
 (async () => {
   const mod = await import('p-queue');
@@ -209,11 +210,14 @@ if (cluster.isMaster) {
 
       const getStation = async (lat, lon) => {
         const key = `${lat},${lon}`;
+        if (stationCache.has(key)) return stationCache.get(key);
 
         const url = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${lat}&lon=${lon}&tag=railway_station&radius=30000&limit=1`;
 
         const res = await rateLimitedFetch(url);
         const data = await res.json();
+        stationCache.set(key, data);
+
         return data;
       };
 
@@ -222,6 +226,12 @@ if (cluster.isMaster) {
         getStation(origin[1], origin[0]),
         getStation(destination[1], destination[0]),
       ]);
+
+      console.log(
+        originStationData.length,
+        destinationStationData.length,
+        'getStation'
+      );
 
       const originStation = originStationData?.[0];
       const destinationStation = destinationStationData?.[0];
