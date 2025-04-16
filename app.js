@@ -1,35 +1,38 @@
-const express = require('express');
-const searoute = require('./sea-route');
-const cors = require('cors');
-const cluster = require('cluster');
-const os = require('os');
-const compression = require('compression');
-const { promisify } = require('util');
-var polyline = require('@mapbox/polyline');
+import express from 'express';
+import searoute from './sea-route.js'; // Ensure sea-route is also ESM or default-exported
+import cors from 'cors';
+import cluster from 'cluster';
+import os from 'os';
+import compression from 'compression';
+import { promisify } from 'util';
+import polyline from '@mapbox/polyline';
+import Bottleneck from 'bottleneck';
 
-let PQueue;
-let locationIQQueue;
-const stationCache = new Map();
+const limiter = new Bottleneck({
+  minTime: 1000,
+  maxConcurrent: 1,
+});
 
-(async () => {
-  const mod = await import('p-queue');
-  PQueue = mod.default;
+async function callExternalApi(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    // console.error('API call failed:', error);
+    throw error; // Re-throw so Bottleneck can handle it
+  }
+}
 
-  // Create queue after import
-  locationIQQueue = new PQueue({
-    interval: 1000, // 1 second window
-    intervalCap: 2, // max 2 requests per window
-  });
-})();
+// Wrap your API call with the limiter
+const throttledApiCall = limiter.wrap(callExternalApi);
 
 // Cache configuration
-const NodeCache = require('node-cache');
+import NodeCache from 'node-cache';
 const routeCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
-const rateLimitedFetch = (url) => locationIQQueue.add(() => fetch(url));
-
 // Number of workers based on CPU cores
-const numCPUs = os.cpus().length;
+const numCPUs = os.cpus().length - 5;
 
 if (cluster.isMaster) {
   console.log(`Master ${process.pid} is running`);
@@ -208,30 +211,21 @@ if (cluster.isMaster) {
         });
       }
 
-      const getStation = async (lat, lon) => {
-        const key = `${lat},${lon}`;
-        if (stationCache.has(key)) return stationCache.get(key);
+      const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
+      const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
 
-        const url = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${lat}&lon=${lon}&tag=railway_station&radius=30000&limit=1`;
+      const originStationDataScheduled = await limiter.schedule(async () => {
+        return callExternalApi(originStationUrl);
+      });
 
-        const res = await rateLimitedFetch(url);
-        const data = await res.json();
-        stationCache.set(key, data);
-
-        return data;
-      };
-
-      // Fetch origin and destination stations with throttling
-      const [originStationData, destinationStationData] = await Promise.all([
-        getStation(origin[1], origin[0]),
-        getStation(destination[1], destination[0]),
-      ]);
-
-      console.log(
-        originStationData.length,
-        destinationStationData.length,
-        'getStation'
+      const destinationStationDataScheduled = await limiter.schedule(
+        async () => {
+          return callExternalApi(destinationStationUrl);
+        }
       );
+
+      const originStationData = await originStationDataScheduled;
+      const destinationStationData = await destinationStationDataScheduled;
 
       const originStation = originStationData?.[0];
       const destinationStation = destinationStationData?.[0];

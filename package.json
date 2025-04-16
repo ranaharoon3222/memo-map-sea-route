@@ -2,6 +2,7 @@
   "name": "testing",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js"
@@ -11,6 +12,7 @@
   "description": "",
   "dependencies": {
     "@mapbox/polyline": "^1.2.1",
+    "bottleneck": "^2.19.5",
     "compression": "^1.8.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
