@@ -2,7 +2,7 @@
 
 const LOCATIONIQ_API_KEY = 'pk.ae0aa4e320807af8aea45aec765af851';
 const requestQueue = [];
-const DELAY_BETWEEN_REQUESTS = 10; // 1.5 seconds between batches
+const DELAY_BETWEEN_REQUESTS = 500; // 1.5 seconds between batches
 
 let isProcessing = false;
 
@@ -30,11 +30,11 @@ async function processQueue() {
   const { params1, params2, resolve, reject } = requestQueue.shift();
 
   try {
-    await sleep(1100);
+    await sleep(1400);
 
     const data1 = await fetchNearby(params1);
 
-    await sleep(1100);
+    await sleep(1400);
 
     const data2 = await fetchNearby(params2);
 
