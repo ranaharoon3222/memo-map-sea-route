@@ -12,12 +12,11 @@ const { getNearbyData } = require('./locationQue');
 const NodeCache = require('node-cache');
 const oneYearInSeconds = 365 * 24 * 60 * 60;
 
-// 1 month check period = 30 days × 24 hours × 60 minutes × 60 seconds
-const oneMonthInSeconds = 30 * 24 * 60 * 60;
+const twentyDaysInSeconds = 20 * 24 * 60 * 60;
 
 const routeCache = new NodeCache({
-  stdTTL: oneYearInSeconds, // items expire in 1 year
-  checkperiod: oneMonthInSeconds, // cleanup runs every 1 month
+  stdTTL: oneYearInSeconds,
+  checkperiod: twentyDaysInSeconds,
 });
 
 // Number of workers based on CPU cores
