@@ -1,34 +1,14 @@
-import express from 'express';
-import searoute from './sea-route.js'; // Ensure sea-route is also ESM or default-exported
-import cors from 'cors';
-import cluster from 'cluster';
-import os from 'os';
-import compression from 'compression';
-import { promisify } from 'util';
-import polyline from '@mapbox/polyline';
-import Bottleneck from 'bottleneck';
-
-const limiter = new Bottleneck({
-  minTime: 1000,
-  maxConcurrent: 1,
-});
-
-async function callExternalApi(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return await res.json();
-  } catch (error) {
-    // console.error('API call failed:', error);
-    throw error; // Re-throw so Bottleneck can handle it
-  }
-}
-
-// Wrap your API call with the limiter
-const throttledApiCall = limiter.wrap(callExternalApi);
+const express = require('express');
+const searoute = require('./sea-route');
+const cors = require('cors');
+const cluster = require('cluster');
+const os = require('os');
+const compression = require('compression');
+const { promisify } = require('util');
+var polyline = require('@mapbox/polyline');
 
 // Cache configuration
-import NodeCache from 'node-cache';
+const NodeCache = require('node-cache');
 const routeCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
 // Number of workers based on CPU cores
@@ -214,18 +194,12 @@ if (cluster.isMaster) {
       const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
       const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
 
-      const originStationDataScheduled = await limiter.schedule(async () => {
-        return callExternalApi(originStationUrl);
-      });
+      const originResPromise = await fetch(originStationUrl);
 
-      const destinationStationDataScheduled = await limiter.schedule(
-        async () => {
-          return callExternalApi(destinationStationUrl);
-        }
-      );
+      const destinationResPromise = await fetch(destinationStationUrl);
 
-      const originStationData = await originStationDataScheduled;
-      const destinationStationData = await destinationStationDataScheduled;
+      const originStationData = await originResPromise.json();
+      const destinationStationData = await destinationResPromise.json();
 
       const originStation = originStationData?.[0];
       const destinationStation = destinationStationData?.[0];
