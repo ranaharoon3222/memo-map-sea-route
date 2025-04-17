@@ -8,6 +8,7 @@ const { promisify } = require('util');
 var polyline = require('@mapbox/polyline');
 const { getNearbyData } = require('./locationQue');
 const axios = require('axios');
+const { getThreeClosestStations } = require('./locationQue');
 
 // Cache configuration
 const NodeCache = require('node-cache');
@@ -200,35 +201,16 @@ if (cluster.isMaster) {
         });
       }
 
-      // const nearByStations = await getNearbyData(
-      //   {
-      //     lat: origin[1],
-      //     lon: origin[0],
-      //     radius: 30000,
-      //     limit: 1,
-      //     tag: 'railway_station',
-      //   },
-      //   {
-      //     lat: destination[1],
-      //     lon: destination[0],
-      //     radius: 30000,
-      //     limit: 1,
-      //     tag: 'railway_station',
-      //   }
-      // );
+      const [originRes, destinationRes] = await Promise.all([
+        getThreeClosestStations(origin[1], origin[0]),
+        getThreeClosestStations(destination[1], destination[0]),
+      ]);
 
-      const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
-      const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
+      const originStation = originRes?.stations?.[0];
+      const destinationStation = destinationRes?.stations?.[0];
 
-      const originResPromise = await fetch(originStationUrl);
-
-      const destinationResPromise = await fetch(destinationStationUrl);
-
-      const originStationData = await originResPromise.json();
-      const destinationStationData = await destinationResPromise.json();
-
-      const originStation = originStationData?.[0];
-      const destinationStation = destinationStationData?.[0];
+      // const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
+      // const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
 
       if (!originStation || !destinationStation) {
         return res.status(404).json({
@@ -238,11 +220,11 @@ if (cluster.isMaster) {
       }
 
       const newOrigin = [
-        parseFloat(originStation.lon),
+        parseFloat(originStation.lng),
         parseFloat(originStation.lat),
       ];
       const newDestination = [
-        parseFloat(destinationStation.lon),
+        parseFloat(destinationStation.lng),
         parseFloat(destinationStation.lat),
       ];
 
