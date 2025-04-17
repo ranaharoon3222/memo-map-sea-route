@@ -2,15 +2,15 @@
 
 const LOCATIONIQ_API_KEY = 'pk.ae0aa4e320807af8aea45aec765af851';
 const requestQueue = [];
-const DELAY_BETWEEN_REQUESTS = 500; // 1.5 seconds between batches
+const DELAY_BETWEEN_REQUESTS = 1000; // 1.5 seconds between batches
 
 let isProcessing = false;
 
 function getNearbyData(params1, params2) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     requestQueue.push({ params1, params2, resolve, reject });
     if (!isProcessing) {
-      processQueue();
+      await processQueue();
     }
   });
 }
@@ -27,14 +27,14 @@ async function processQueue() {
 
   isProcessing = true;
 
+  await sleep(1500);
+
   const { params1, params2, resolve, reject } = requestQueue.shift();
 
   try {
-    await sleep(1400);
-
     const data1 = await fetchNearby(params1);
 
-    await sleep(1400);
+    await sleep(1500);
 
     const data2 = await fetchNearby(params2);
 
@@ -44,7 +44,7 @@ async function processQueue() {
   }
 
   await sleep(DELAY_BETWEEN_REQUESTS);
-  processQueue();
+  await processQueue();
 }
 
 async function fetchNearby(params) {
