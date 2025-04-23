@@ -10,6 +10,10 @@ const { getNearbyData } = require('./locationQue');
 const axios = require('axios');
 const { getThreeClosestStations } = require('./locationQue');
 
+const fs = require('fs');
+const path = require('path');
+const turf = require('@turf/turf');
+
 // Cache configuration
 const NodeCache = require('node-cache');
 const oneYearInSeconds = 365 * 24 * 60 * 60;
@@ -23,6 +27,53 @@ const routeCache = new NodeCache({
 
 // Number of workers based on CPU cores
 const numCPUs = os.cpus().length;
+
+function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './railway_stations.geojson') {
+  // Load GeoJSON data from file
+  let geojson;
+  try {
+    const fileData = fs.readFileSync(path.resolve(geoJsonFilePath), 'utf8');
+    geojson = JSON.parse(fileData);
+  } catch (error) {
+    console.error(`Error reading GeoJSON file: ${error.message}`);
+    return null;
+  }
+
+  // Create point from user location
+  const point = turf.point([lng, lat]);
+
+  // Track the nearest station
+  let nearestStation = null;
+  let shortestDistance = Infinity;
+
+  // Find the station with minimum distance
+  geojson.features.forEach(feature => {
+    // Make sure feature is a valid GeoJSON point
+    if (feature.geometry && feature.geometry.type === 'Point') {
+      try {
+        const stationPoint = turf.point(feature.geometry.coordinates);
+        const distance = turf.distance(point, stationPoint);
+
+        // Update nearest station if this one is closer
+        if (distance < shortestDistance && distance <= maxRadiusInKm) {
+          shortestDistance = distance;
+          nearestStation = {
+            id: feature.properties.id,
+            name: feature.properties.name || 'Unnamed Station',
+            coordinates: feature.geometry.coordinates,
+            lng: feature.geometry.coordinates[0],
+            lat: feature.geometry.coordinates[1],
+            distance: distance // in kilometers
+          };
+        }
+      } catch (err) {
+        console.error(`Error processing feature ${feature.properties?.id}: ${err.message}`);
+      }
+    }
+  });
+
+  return nearestStation;
+}
 
 if (cluster.isMaster) {
   console.log(`Master ${process.pid} is running`);
@@ -202,15 +253,22 @@ if (cluster.isMaster) {
       }
 
       const [originRes, destinationRes] = await Promise.all([
-        getThreeClosestStations(origin[1], origin[0]),
-        getThreeClosestStations(destination[1], destination[0]),
+        findNearestStation(origin[1], origin[0], 30),
+        findNearestStation(destination[1], destination[0], 30),
       ]);
 
-      const originStation = originRes?.stations?.[0];
-      const destinationStation = destinationRes?.stations?.[0];
+      // const [originRes, destinationRes] = await Promise.all([
+      //   getThreeClosestStations(origin[1], origin[0]),
+      //   getThreeClosestStations(destination[1], destination[0]),
+      // ]);
 
-      // const originStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${origin[1]}&lon=${origin[0]}&tag=railway_station&radius=30000&limit=1`;
-      // const destinationStationUrl = `https://eu1.locationiq.com/v1/nearby?key=pk.ae0aa4e320807af8aea45aec765af851&lat=${destination[1]}&lon=${destination[0]}&tag=railway_station&radius=30000&limit=1`;
+      // const originStation = originRes?.stations?.[0];
+      // const destinationStation = destinationRes?.stations?.[0]; 
+
+
+      const originStation = originRes;
+      const destinationStation = destinationRes;
+
 
       if (!originStation || !destinationStation) {
         return res.status(404).json({

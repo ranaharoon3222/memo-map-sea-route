@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "@mapbox/polyline": "^1.2.1",
+    "@turf/turf": "^7.2.0",
     "axios": "^1.8.4",
     "bottleneck": "^2.19.5",
     "compression": "^1.8.0",
