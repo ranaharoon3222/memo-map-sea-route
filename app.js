@@ -26,7 +26,7 @@ const routeCache = new NodeCache({
 });
 
 // Number of workers based on CPU cores
-const numCPUs = os.cpus().length;
+const numCPUs = os.cpus().length - 7;
 
 function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './railway_stations.geojson') {
   // Load GeoJSON data from file
@@ -46,6 +46,9 @@ function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './
   let nearestStation = null;
   let shortestDistance = Infinity;
 
+  const nearbyStations = [];
+
+
   // Find the station with minimum distance
   geojson.features.forEach(feature => {
     // Make sure feature is a valid GeoJSON point
@@ -53,6 +56,17 @@ function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './
       try {
         const stationPoint = turf.point(feature.geometry.coordinates);
         const distance = turf.distance(point, stationPoint);
+
+        if (distance <= maxRadiusInKm && nearbyStations.length < 5) {
+          nearbyStations.push({
+            id: feature.properties.id,
+            name: feature.properties.name || 'Unnamed Station',
+            coordinates: feature.geometry.coordinates,
+            lng: feature.geometry.coordinates[0],
+            lat: feature.geometry.coordinates[1],
+            distance: distance
+          });
+        }
 
         // Update nearest station if this one is closer
         if (distance < shortestDistance && distance <= maxRadiusInKm) {
@@ -72,7 +86,11 @@ function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './
     }
   });
 
-  return nearestStation;
+  if (nearbyStations.length > 0) {
+    return nearbyStations[1];
+  } else {
+    return nearbyStations[0];
+  }
 }
 
 if (cluster.isMaster) {
@@ -286,9 +304,14 @@ if (cluster.isMaster) {
         parseFloat(destinationStation.lat),
       ];
 
-      const url = `https://routing.openrailrouting.org/route?point=${newOrigin[0]}%2C${newOrigin[1]}&point=${newDestination[0]}%2C${newDestination[1]}&type=json&locale=en-US&&profile=all_tracks`;
+      const url = `https://routing.openrailrouting.org/route?point=${newOrigin[0]}%2C${newOrigin[1]}&point=${newDestination[0]}%2C${newDestination[1]}&type=json&locale=en-US&&profile=non_tgv`;
 
       const url2 = `https://signal.eu.org/osm/eu/route/v1/train/${newOrigin[0]},${newOrigin[1]};${newDestination[0]},${newDestination[1]}?overview=full`;
+
+
+      console.log('URL2:', url2);
+      console.log('URL:', url);
+
 
       const fetchRes = await fetch(url2);
       const data = await fetchRes.json();
