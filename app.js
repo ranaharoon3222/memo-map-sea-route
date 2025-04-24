@@ -26,7 +26,7 @@ const routeCache = new NodeCache({
 });
 
 // Number of workers based on CPU cores
-const numCPUs = os.cpus().length - 7;
+const numCPUs = os.cpus().length;
 
 function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './railway_stations.geojson') {
   // Load GeoJSON data from file
