@@ -16,8 +16,10 @@
     "bottleneck": "^2.19.5",
     "compression": "^1.8.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "node-cache": "^5.1.2",
+    "nodemailer": "^6.10.1",
     "nodemon": "^3.1.9",
     "p-queue": "^8.1.0",
     "searoute-js": "^0.1.0"

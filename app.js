@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const searoute = require('./sea-route');
 const cors = require('cors');
@@ -9,6 +11,8 @@ var polyline = require('@mapbox/polyline');
 const { getNearbyData } = require('./locationQue');
 const axios = require('axios');
 const { getThreeClosestStations } = require('./locationQue');
+
+const nodemailer = require('nodemailer');
 
 const fs = require('fs');
 const path = require('path');
@@ -28,18 +32,19 @@ const routeCache = new NodeCache({
 // Number of workers based on CPU cores
 const numCPUs = os.cpus().length;
 
+
+let geojson;
+try {
+  const fileData = fs.readFileSync(path.resolve('./railway_stations.geojson'), 'utf8');
+  geojson = JSON.parse(fileData);
+} catch (error) {
+  console.error(`Error reading GeoJSON file: ${error.message}`);
+  return null;
+}
+
+
 function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './railway_stations.geojson') {
   // Load GeoJSON data from file
-  let geojson;
-  try {
-    const fileData = fs.readFileSync(path.resolve(geoJsonFilePath), 'utf8');
-    geojson = JSON.parse(fileData);
-  } catch (error) {
-    console.error(`Error reading GeoJSON file: ${error.message}`);
-    return null;
-  }
-
-  // Create point from user location
   const point = turf.point([lng, lat]);
 
   // Track the nearest station
@@ -50,14 +55,15 @@ function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './
 
 
   // Find the station with minimum distance
-  geojson.features.forEach(feature => {
-    // Make sure feature is a valid GeoJSON point
+  for (let i = 0; i < geojson.features.length; i++) {
+    const feature = geojson.features[i];
+
     if (feature.geometry && feature.geometry.type === 'Point') {
       try {
         const stationPoint = turf.point(feature.geometry.coordinates);
         const distance = turf.distance(point, stationPoint);
 
-        if (distance <= maxRadiusInKm && nearbyStations.length < 5) {
+        if (distance <= maxRadiusInKm) {
           nearbyStations.push({
             id: feature.properties.id,
             name: feature.properties.name || 'Unnamed Station',
@@ -66,25 +72,16 @@ function findNearestStation (lat, lng, maxRadiusInKm = 10, geoJsonFilePath = './
             lat: feature.geometry.coordinates[1],
             distance: distance
           });
+
+          if (nearbyStations.length >= 2) break;
         }
 
-        // Update nearest station if this one is closer
-        if (distance < shortestDistance && distance <= maxRadiusInKm) {
-          shortestDistance = distance;
-          nearestStation = {
-            id: feature.properties.id,
-            name: feature.properties.name || 'Unnamed Station',
-            coordinates: feature.geometry.coordinates,
-            lng: feature.geometry.coordinates[0],
-            lat: feature.geometry.coordinates[1],
-            distance: distance // in kilometers
-          };
-        }
       } catch (err) {
         console.error(`Error processing feature ${feature.properties?.id}: ${err.message}`);
       }
     }
-  });
+  }
+
 
   if (nearbyStations.length > 0) {
     return nearbyStations[1];
@@ -270,18 +267,14 @@ if (cluster.isMaster) {
         });
       }
 
+      console.time('Find Nearest Stations');
       const [originRes, destinationRes] = await Promise.all([
         findNearestStation(origin[1], origin[0], 30),
         findNearestStation(destination[1], destination[0], 30),
       ]);
+      console.timeEnd('Find Nearest Stations');
 
-      // const [originRes, destinationRes] = await Promise.all([
-      //   getThreeClosestStations(origin[1], origin[0]),
-      //   getThreeClosestStations(destination[1], destination[0]),
-      // ]);
 
-      // const originStation = originRes?.stations?.[0];
-      // const destinationStation = destinationRes?.stations?.[0]; 
 
 
       const originStation = originRes;
@@ -313,12 +306,13 @@ if (cluster.isMaster) {
       console.log('URL:', url);
 
 
+      console.time('Fetch Route Data');
       const fetchRes = await fetch(url2);
       const data = await fetchRes.json();
+      console.timeEnd('Fetch Route Data');
 
       // const point = data['paths'][0]['points'];
       const point = data['routes'][0]['geometry'];
-
       const converToJson = polyline.toGeoJSON(point);
 
       const result = {
@@ -333,13 +327,6 @@ if (cluster.isMaster) {
         },
       };
 
-      // const result = {
-      //   type: 'Feature',
-      //   properties: {},
-      //   geometry: converToJson,
-      // };
-
-      // Store in cache
       routeCache.set(cacheKey, result);
 
       // Return the route data
@@ -350,6 +337,35 @@ if (cluster.isMaster) {
         error: 'Failed to calculate route',
         message: error.message,
       });
+    }
+  });
+
+
+  app.post('/send-email', async (req, res) => {
+    const { to, subject, text } = req.body;
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: "smtp.ionos.de",
+        port: 587,
+        secure: false, // true for port 465, false for 587
+        auth: {
+          user: "hey@memomap.store",
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      });
+
+      await transporter.sendMail({
+        from: '"MemoMap" <hey@memomap.store>',
+        to: to,
+        subject: subject,
+        text: text,
+      });
+
+      res.json({ success: true, message: 'Email sent successfully!' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Failed to send email', error });
     }
   });
 
