@@ -356,7 +356,7 @@ if (cluster.isMaster) {
       });
 
       await transporter.sendMail({
-        from: '"MemoMap " <hey@memomap.store>',
+        from: '"MemoMap" <hey@memomap.store>',
         to: to,
         subject: subject,
         text: text,
